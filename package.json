@@ -1,0 +1,22 @@
+{
+  "name": "amqp-microservice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahmadnaufalhakim/amqp-microservice.git"
+  },
+  "author": "Ahmad Naufal Hakim",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ahmadnaufalhakim/amqp-microservice/issues"
+  },
+  "homepage": "https://github.com/ahmadnaufalhakim/amqp-microservice#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}

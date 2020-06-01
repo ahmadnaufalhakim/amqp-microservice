@@ -17,8 +17,6 @@ amqp.connect(AMQP_URL, (error, connection) => {
 
         ch.consume('create-student', (msg) => {
             const obj = JSON.parse(msg.content);
-            console.log('create-student');
-            console.log('Message:', obj);
             pool.query(`INSERT INTO student(name) VALUES('${obj.payload}')`)
                 .then((results) => {
                     console.log(results);
@@ -32,8 +30,6 @@ amqp.connect(AMQP_URL, (error, connection) => {
         ch.consume('find-student-by-id', (msg) => {
             try {
                 const obj = JSON.parse(msg.content);
-                console.log(obj);
-                console.log(obj.payload);
                 pool.query(`SELECT * FROM student WHERE registration_number = ${obj.payload}`)
                 .then((results) => {
                     console.log(results[0]);

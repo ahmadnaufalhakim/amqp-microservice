@@ -1,7 +1,11 @@
 const amqp = require('amqplib/callback_api');
-const AMQP_URL = 'amqp://localhost';
+// Match with the rabbitmq container configuration
+const AMQP_URL = 'amqp://rabbitmq';
 
 const pool = require('./db/db_connection');
+
+const CREATE_STUDENT_QUEUE = 'create-student';
+const FIND_STUDENT_BY_ID_QUEUE = 'find-student-by-id';
 
 let ch = null;
 amqp.connect(AMQP_URL, (error, connection) => {
@@ -15,45 +19,128 @@ amqp.connect(AMQP_URL, (error, connection) => {
         }
         ch = channel;
 
-        ch.consume('create-student', (msg) => {
-            try {
-                const obj = JSON.parse(msg.content);
-                pool.query(`INSERT INTO student(name) VALUES('${obj.payload}')`)
-                    .then((results) => {
-                        console.log(results);
-                        ch.sendToQueue('create-student_res', Buffer.from(JSON.stringify(results)), { persistent: true });
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                        ch.sendToQueue('create-student_res', Buffer.from(JSON.stringify(error)), { persistent: true });
-                    });
-            } catch (error) {
-                console.log(error);
-                ch.sendToQueue('create-student_res', Buffer.from(JSON.stringify(error), { persistent: true }));
+        ch.assertQueue(CREATE_STUDENT_QUEUE, {
+            durable: true
+        }, (error, req_queue) => {
+            if (error) {
+                throw error;
             }
-        }, { noAck: true });
 
-        ch.consume('find-student-by-id', (msg) => {
-            try {
-                const obj = JSON.parse(msg.content);
-                pool.query(`SELECT * FROM student WHERE registration_number = ${obj.payload}`)
-                    .then((results) => {
-                        console.log(results[0]);
-                        ch.sendToQueue('find-student-by-id_res', Buffer.from(JSON.stringify(results[0])), { persistent: true });
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                        ch.sendToQueue('find-student-by-id_res', Buffer.from(JSON.stringify(error)), { persistent: true });
+            ch.consume(req_queue.queue, (msg) => {
+                try {
+                    const obj = JSON.parse(msg.content);
+                    pool.getConnection()
+                        .then((db_connection) => {
+                            db_connection.query(`INSERT INTO student(name) VALUES('${obj.payload}')`)
+                                .then((results) => {
+                                    ch.assertQueue(msg.properties.replyTo, {
+                                        durable: true
+                                    }, (error, res_queue) => {
+                                        if (error) {
+                                            throw error;
+                                        }
+                                        const reply = JSON.stringify(results);
+                                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                                            correlationId: msg.properties.correlationId
+                                        });
+                                    });
+                                })
+                                .catch((err) => {
+                                    ch.assertQueue(msg.properties.replyTo, {
+                                        durable: true
+                                    }, (error, res_queue) => {
+                                        if (error) {
+                                            throw error;
+                                        }
+                                        const reply = JSON.stringify(err);
+                                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                                            correlationId: msg.properties.correlationId
+                                        });
+                                    });
+                                })
+                                .finally(() => {
+                                    db_connection.release();
+                                });
+                        })
+                        .catch((error) => {
+                            throw error;
+                        });
+                } catch (err) {
+                    ch.assertQueue(msg.properties.replyTo, {
+                        durable: true
+                    }, (error, res_queue) => {
+                        if (error) {
+                            throw error;
+                        }
+                        const reply = JSON.stringify(err);
+                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                            correlationId: msg.properties.correlationId
+                        });
                     });
-            } catch (error) {
-                console.log(error);
-                ch.sendToQueue('find-student-by-id_res', Buffer.from(JSON.stringify(error)), { persistent: true });
+                }
+            });
+        });
+
+        ch.assertQueue(FIND_STUDENT_BY_ID_QUEUE, {
+            durable: true
+        }, (error, req_queue) => {
+            if (error) {
+                throw error;
             }
-        }, { noAck: true });
+
+            ch.consume(req_queue.queue, (msg) => {
+                try {
+                    const obj = JSON.parse(msg.content);
+                    pool.getConnection()
+                        .then((db_connection) => {
+                            db_connection.query(`SELECT * FROM student WHERE registration_number = ${obj.payload}`)
+                                .then((results) => {
+                                    ch.assertQueue(msg.properties.replyTo, {
+                                        durable: true
+                                    }, (error, res_queue) => {
+                                        if (error) {
+                                            throw error;
+                                        }
+                                        const reply = JSON.stringify(results[0]);
+                                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                                            correlationId: msg.properties.correlationId
+                                        });
+                                    });
+                                })
+                                .catch((err) => {
+                                    ch.assertQueue(msg.properties.replyTo, {
+                                        durable: true
+                                    }, (error, res_queue) => {
+                                        if (error) {
+                                            throw error;
+                                        }
+                                        const reply = JSON.stringify(err);
+                                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                                            correlationId: msg.properties.correlationId
+                                        });
+                                    });
+                                })
+                                .finally(() => {
+                                    db_connection.release();
+                                });
+                        })
+                        .catch((error) => {
+                            throw error;
+                        });
+                } catch (err) {
+                    ch.assertQueue(msg.properties.replyTo, {
+                        durable: true
+                    }, (error, res_queue) => {
+                        if (error) {
+                            throw error;
+                        }
+                        const reply = JSON.stringify(err);
+                        ch.sendToQueue(res_queue.queue, Buffer.from(reply), {
+                            correlationId: msg.properties.correlationId
+                        });
+                    });
+                }
+            });
+        });
     });
-});
-
-process.on('exit', () => {
-    ch.close();
-    console.log('Closing RabbitMQ channel');
 });

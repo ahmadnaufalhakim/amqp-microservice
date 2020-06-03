@@ -1,9 +1,10 @@
 const config = {
-    host: 'localhost',
+	// Match with the db container configuration
+    host: 'mariadb',
+	port: 3306,
 	user: 'root',
 	password: 'root',
-	database: 'tesdb',
-	connectionLimit: 5
+	database: 'tesdb'
 };
 
 module.exports = config;

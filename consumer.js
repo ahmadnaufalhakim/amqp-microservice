@@ -1,6 +1,12 @@
 const amqp = require('amqplib/callback_api');
+const isDocker = require('is-docker');
+require('dotenv').config();
+
 // Match with the rabbitmq container configuration
-const AMQP_URL = 'amqp://rabbitmq';
+const AMQP_HOST = isDocker()
+    ? process.env.DOCKER_RABBITMQ_HOST
+    : 'localhost';
+const AMQP_URL = `amqp://${AMQP_HOST}`;
 
 const pool = require('./db/db_connection');
 
